@@ -1,0 +1,25 @@
+swampVersion: 20260911.215321.0
+initializedAt: "2026-09-13T00:01:37.401Z"
+repoId: 20a243e9-ec9d-47e9-b8a9-0a70cef29d6b
+tools:
+  - pi
+gitignoreManaged: true
+datastore:
+  type: filesystem
+  path: $HOME/git/swamp-dashboard-via-traces/.swamp
+  directories:
+    - auto-definitions
+    - definitions-evaluated
+    - workflows-evaluated
+    - config
+    - data
+    - outputs
+    - workflow-runs
+    - secrets
+    - bundles
+    - vault-bundles
+    - report-bundles
+    - audit
+    - telemetry
+    - logs
+    - files

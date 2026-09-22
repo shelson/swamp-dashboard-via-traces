@@ -1,0 +1,54 @@
+id: 4886096e-8afe-41ef-acc4-a730ffab9381
+name: demo
+tags: {}
+jobs:
+  - name: main
+    description: Demo job
+    steps:
+      - name: prepare
+        task:
+          type: model_method
+          modelIdOrName: demo
+          methodName: execute
+          inputs:
+            run: sleep 2; echo prepared
+        dependsOn: []
+      - name: work-a
+        task:
+          type: model_method
+          modelIdOrName: demo
+          methodName: execute
+          inputs:
+            run: sleep 3; echo a
+        dependsOn:
+          - step: prepare
+            condition:
+              type: succeeded
+      - name: work-b
+        task:
+          type: model_method
+          modelIdOrName: demo
+          methodName: execute
+          inputs:
+            run: sleep 4; echo b
+        dependsOn:
+          - step: prepare
+            condition:
+              type: succeeded
+      - name: finish
+        task:
+          type: model_method
+          modelIdOrName: demo
+          methodName: execute
+          inputs:
+            run: echo done
+        dependsOn:
+          - step: work-a
+            condition:
+              type: succeeded
+          - step: work-b
+            condition:
+              type: succeeded
+    dependsOn: []
+    weight: 0
+version: 1

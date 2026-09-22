@@ -1,0 +1,243 @@
+type: '@swamp/software-factory'
+typeVersion: 2026.06.24.1
+id: 42a71c73-c6f9-49c5-9dce-c44bba233b92
+name: demo-factory
+version: 1
+tags: {}
+globalArguments:
+  stages:
+    # ── planning: interactive session where the work goal is communicated ──
+    - id: planning
+      initial: true
+      description: >
+        Interactive planning session. The human communicates the work goal here —
+        what should be built, constraints, acceptance criteria. No external tracker
+        needed; this is the intake point for the factory.
+      work:
+        mode: interactive
+        skills: [planning]
+        systemPrompt: |
+          This is a DEMO software factory. The human will describe the work goal.
+          Work with them to produce an agreed implementation plan. DO NOT write any
+          production code — this factory is for trace/dashboard testing.
+
+          When the human signs off, record the plan artifact:
+            swamp model method run demo-factory record_artifact --input "workItem=${{ self.workItem }}" --input name=plan --stdin <<< '{"summary":"...","steps":[{"description":"...","files":[]}],"testingStrategy":"..."}'
+
+          The plan schema expects: summary (string), steps (array of {description, files}), testingStrategy (string).
+      artifacts:
+        - name: plan
+          schema:
+            type: object
+            required: [summary, steps, testingStrategy]
+            properties:
+              summary: { type: string, minLength: 1 }
+              steps:
+                type: array
+                minItems: 1
+                items:
+                  type: object
+                  required: [description]
+                  properties:
+                    description: { type: string }
+                    files: { type: array, items: { type: string } }
+              testingStrategy: { type: string }
+      transitions:
+        - name: submit
+          to: plan-review
+          gates:
+            - type: artifact-exists
+              config: { artifact: plan }
+
+    # ── plan-review: adversarial dispatch review of the plan ──
+    - id: plan-review
+      description: >
+        Adversarial review of the plan. The dispatch agent reviews the plan and
+        records findings. On re-entry it fetches prior findings to verify resolutions.
+      work:
+        mode: dispatch
+        skills: [adversarial-review]
+        systemPrompt: |
+          You are an adversarial reviewer in a DEMO factory. Review the plan
+          recorded for work item ${{ self.workItem }}.
+
+          Fetch the plan:
+            swamp data query 'modelName == "demo-factory" && name == "artifact-${{ self.workItem }}-plan"' --select attributes.payload --json
+
+          Record findings as a findings artifact. Use stable, prefixed ids (PLAN-1, PLAN-2, ...).
+          Since this is a demo, keep findings realistic but not blocking — use
+          medium/low severity for anything that would normally be high.
+
+          When done, record:
+            swamp model method run demo-factory record_artifact --input "workItem=${{ self.workItem }}" --input name=plan-review --stdin <<< '{"findings":[{"id":"PLAN-1","severity":"medium","description":"..."}]}'
+      artifacts:
+        - name: plan-review
+          kind: findings
+          reviews: plan
+      transitions:
+        - name: approve
+          to: implementing
+          gates:
+            - type: artifact-fresh
+              config: { artifact: plan-review, recordedThisCycle: true }
+            - type: findings-clear
+              config: { artifact: plan-review, blocking: [critical, high] }
+            - type: human-approval
+              config: { id: plan-approval }
+        - name: rework
+          to: planning
+
+    # ── implementing: simulated implementation (noop) ──
+    - id: implementing
+      description: >
+        Simulated implementation. The agent "implements" the plan by simulating
+        work — no real code is written. Produces a change-summary artifact and
+        branch-info evidence for trace data.
+      work:
+        mode: interactive
+        skills: [implementation]
+        systemPrompt: |
+          This is a DEMO software factory — DO NOT write production code.
+
+          Simulate implementing the plan. Read it:
+            swamp data query 'modelName == "demo-factory" && name == "artifact-${{ self.workItem }}-plan"' --select attributes.payload --json
+
+          Simulate the work by:
+          1. Creating a mock branch name like "feature/${{ self.workItem }}-demo"
+          2. Echoing what files you "would" touch
+          3. Recording a change-summary artifact describing the simulated changes
+          4. Recording branch-info evidence with the mock branch and a fake SHA
+
+          Record when done:
+            swamp model method run demo-factory record_artifact --input "workItem=${{ self.workItem }}" --input name=change-summary --stdin <<< '{"summary":"Simulated implementation of ...","headSha":"abc1234"}'
+            swamp model method run demo-factory record_evidence --input "workItem=${{ self.workItem }}" --input name=branch-info --stdin <<< '{"branch":"feature/${{ self.workItem }}-demo","headSha":"abc1234"}'
+
+          Keep it short — this is a demo for trace output.
+      artifacts:
+        - name: change-summary
+          schema:
+            type: object
+            required: [summary, headSha]
+            properties:
+              summary: { type: string }
+              headSha: { type: string, minLength: 7 }
+      evidence:
+        - name: branch-info
+          schema:
+            type: object
+            required: [branch, headSha]
+            properties:
+              branch: { type: string, minLength: 1 }
+              headSha: { type: string, minLength: 7 }
+      transitions:
+        - name: submit
+          to: testing
+          gates:
+            - type: artifact-exists
+              config: { artifact: change-summary }
+            - type: evidence-recorded
+              config: { name: branch-info }
+
+    # ── testing: simulated test run (noop) ──
+    - id: testing
+      description: >
+        Simulated test execution. Runs mock test commands that echo results
+        rather than running real suites. Produces test-run evidence.
+      work:
+        mode: interactive
+        systemPrompt: |
+          This is a DEMO — simulate running the test suite.
+
+          Read the testing strategy from the plan:
+            swamp data query 'modelName == "demo-factory" && name == "artifact-${{ self.workItem }}-plan"' --select attributes.payload.testingStrategy --json
+
+          Simulate test execution:
+          1. Echo a few mock test commands (e.g. "npm test", "cargo test")
+          2. Report them as passing
+          3. Record test-run evidence with status=succeeded
+
+          Record:
+            swamp model method run demo-factory record_evidence --input "workItem=${{ self.workItem }}" --input name=test-run --stdin <<< '{"status":"succeeded","suite":"demo-tests","passed":5,"failed":0,"duration":"0.42s"}'
+      evidence:
+        - name: test-run
+          schema:
+            type: object
+            required: [status]
+            properties:
+              status: { type: string }
+              suite: { type: string }
+              passed: { type: integer }
+              failed: { type: integer }
+              duration: { type: string }
+      transitions:
+        - name: pass
+          to: code-review
+          gates:
+            - type: evidence-recorded
+              config: { name: test-run, requireField: { status: succeeded } }
+        - name: fail
+          to: implementing
+          gates:
+            - type: evidence-recorded
+              config: { name: test-run, requireField: { status: failed } }
+
+    # ── code-review: adversarial dispatch review of the implementation ──
+    - id: code-review
+      description: >
+        Adversarial review of the simulated implementation. Dispatch agent reviews
+        the change-summary against the plan and records findings.
+      work:
+        mode: dispatch
+        skills: [adversarial-review]
+        systemPrompt: |
+          You are an adversarial reviewer in a DEMO factory. Review the
+          implementation for work item ${{ self.workItem }}.
+
+          Fetch the plan and change-summary:
+            swamp data query 'modelName == "demo-factory" && name == "artifact-${{ self.workItem }}-plan"' --select attributes.payload --json
+            swamp data query 'modelName == "demo-factory" && name == "artifact-${{ self.workItem }}-change-summary"' --select attributes.payload --json
+
+          Record findings. Use stable prefixed ids (CODE-1, CODE-2, ...).
+          Since this is a demo, keep findings realistic but use medium/low severity.
+
+          Record:
+            swamp model method run demo-factory record_artifact --input "workItem=${{ self.workItem }}" --input name=code-review --stdin <<< '{"findings":[{"id":"CODE-1","severity":"low","description":"Demo finding — no real code was reviewed."}]}'
+      artifacts:
+        - name: code-review
+          kind: findings
+          reviews: change-summary
+      transitions:
+        - name: accept
+          to: done
+          gates:
+            - type: artifact-fresh
+              config: { artifact: code-review, recordedThisCycle: true }
+            - type: findings-clear
+              config: { artifact: code-review, blocking: [critical, high] }
+            - type: human-approval
+              config: { id: ship-approval }
+        - name: rework
+          to: implementing
+
+    # ── done: terminal ──
+    - id: done
+      terminal: true
+      description: Work item is complete.
+
+    # ── aborted: terminal (reached via global abort transition) ──
+    - id: aborted
+      terminal: true
+      description: Work item was aborted by a human.
+
+  globalTransitions:
+    - name: abort
+      to: aborted
+      gates:
+        - type: human-approval
+          config: { id: abort-confirmation }
+
+reports:
+  require:
+    - { name: "@swamp/software-factory/work-item-summary", methods: [summary] }
+
+methods: {}

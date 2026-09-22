@@ -2,6 +2,12 @@
 
 POC for a realtime swamp software-factory dashboard powered by OTLP traces and repo polling.
 
+## Demo
+
+<video src="swamp-dashboard-demo.mp4" controls width="100%">
+  <a href="swamp-dashboard-demo.mp4">Download demo video</a>
+</video>
+
 ## What
 
 `dashboard/server.py` is a stdlib-only Python HTTP server that renders a live D3 state-machine view of swamp factory runs. It combines two data sources:

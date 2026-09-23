@@ -4,9 +4,7 @@ POC for a realtime swamp software-factory dashboard powered by OTLP traces and r
 
 ## Demo
 
-<video src="swamp-dashboard-demo.mp4" controls width="100%">
-  <a href="swamp-dashboard-demo.mp4">Download demo video</a>
-</video>
+https://www.youtube.com/watch?v=d-yq_unkZm0
 
 ## What
 
